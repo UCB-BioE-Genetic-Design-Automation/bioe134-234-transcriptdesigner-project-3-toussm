@@ -60,8 +60,7 @@ class CodonChecker:
 
         # Calculate codon diversity
         codon_counts = Counter(cds)
-        total_codons = len(cds)
-        codon_diversity = len(codon_counts) / total_codons if total_codons > 0 else 0.0
+        codon_diversity = len(codon_counts) / 62
 
         # Count rare codons
         rare_codon_count = sum(codon_counts[codon] for codon in self.rare_codons if codon in cds)
@@ -98,7 +97,7 @@ if __name__ == "__main__":
 
     # Hardcoded example CDS
     cds = ['ATG', 'CAA', 'GGG', 'TAA']  # High CAI example
-    # cds = ['AGG', 'AGA', 'AGG', 'AGA']  # Very low CAI example
+    cds = ['AGG', 'AGA', 'AGG', 'AGA']  # Very low CAI example
     
     # Run CodonChecker
     codons_above_board, codon_diversity, rare_codon_count, cai_value = codon_checker.run(cds)
