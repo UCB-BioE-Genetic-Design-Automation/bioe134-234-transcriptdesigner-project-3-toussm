@@ -52,18 +52,11 @@ class TranscriptDesigner:
                     self.aminoAcidToCodon[amino_acid] = []
                 self.aminoAcidToCodon[amino_acid].append((codon, freq))
 
-            # # Calculate relative adaptive parameter and store in self.aminoAcidToCodon
-            # for amino_acid, codons in codon_data.items():
-            #     max_freq = max(freq for _, freq in codons)  # Find max frequency for the amino acid
-            #     self.aminoAcidToCodon[amino_acid] = [(codon, freq / max_freq) for codon, freq in codons]
 
     def guided_random_codon_selection(self, aa):
         codons, weights = zip(*self.aminoAcidToCodon[aa])
         choice = random.choices(codons, weights=weights, k=1)[0]
-        if weights[codons.index(choice)] >= 0.01:
-            return choice
-        else:
-            return self.guided_random_codon_selection(aa)
+        return choice
     
     
     def codon_generator(self, amino_acids, samples=100):
@@ -77,8 +70,9 @@ class TranscriptDesigner:
         score = 0
         if not self.forbiddenSeqChecker.run(seq)[0]:
             score += 10
-        if not self.codonChecker.run(seq)[0]:
-            score += 1
+        if len(seq) > 31:
+            if not self.codonChecker.run(seq)[0]:
+                score += 1
         if not hairpin_checker(seq)[0]:
             score += 1
         if not self.promoterChecker.run(seq):
@@ -110,13 +104,15 @@ class TranscriptDesigner:
             # Define upstream, current window, and downstream context
             preamble = final_sequence[:36]
             current_window = peptide[i:i + window_size]
-            downstream_context = peptide[i + window_size:i + window_size + 6]
+            downstream_context = peptide[i + window_size:len(peptide) - 1]
 
             # Use codon_generator to sample codons for the current window
-            sampled_codons = self.codon_generator(current_window + downstream_context)
-
+            minScore = 10
             # Score each sampled codon sequence
-            scored_codons = [(seq[:9], self.window_scorer(preamble + seq)) for seq in sampled_codons]
+            while minScore >= 3:
+                sampled_codons = self.codon_generator(current_window + downstream_context)
+                scored_codons = [(seq[:9], self.window_scorer(preamble + seq)) for seq in sampled_codons]
+                minScore = min(scored_codons, key=lambda x: x[1])[1]
 
             # Choose the best codon sequence based on score
             best_codon_seq = min(scored_codons, key=lambda x: x[1])[0]
@@ -124,10 +120,16 @@ class TranscriptDesigner:
             # Retain only the middle 3 codons and add to final sequence
             final_sequence += best_codon_seq
 
+            if len(final_sequence) == 18:
+                selectedRBS = self.rbsChooser.run(cds, ignores)
+                while not hairpin_checker(selectedRBS.utr + final_sequence)[0]:
+                    ignores.add(selectedRBS)
+                    selectedRBS = self.rbsChooser.run(cds, ignores)
+
+
         cds += final_sequence
 
             # Choose an RBS
-        selectedRBS = self.rbsChooser.run(cds, ignores)
 
         # Return the Transcript object
         return Transcript(selectedRBS, peptide, codons=[cds[i:i+3] for i in range(0, len(cds), 3)])
