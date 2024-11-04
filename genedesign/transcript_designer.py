@@ -19,6 +19,7 @@ class TranscriptDesigner:
         self.forbiddenSeqChecker = None
         self.codonChecker = None
         self.promoterChecker = None
+        self.selectedRBS = None
         random.seed(10)
 
     def initiate(self) -> None:
@@ -62,7 +63,7 @@ class TranscriptDesigner:
         return random.choices(codons, weights=adjusted_weights, k=1)[0]
     
     
-    def codon_generator(self, amino_acids, samples=500):
+    def codon_generator(self, amino_acids, samples=50):
         sampled_sequences = []
         for _ in range(samples):
             sampled_seq = ''.join(self.guided_random_codon_selection(aa) for aa in amino_acids)
@@ -76,9 +77,9 @@ class TranscriptDesigner:
         if not self.codonChecker.run(seq)[0]:
             score += 5
         if not hairpin_checker(seq)[0]:
-            score += 1
-        # if not self.promoterChecker.run(seq):
-        #     score += 1
+            score += 5
+        if not self.promoterChecker.run(seq):
+            score += 5
         return score
 
     def run(self, peptide: str, ignores: set) -> Transcript:
@@ -92,9 +93,8 @@ class TranscriptDesigner:
         Returns:
             Transcript: The transcript object with the selected RBS and translated codons.
         """
+        # Add stop codon
         peptide += '*'
-
-        #Iterate through the peptide string to 
     
         final_sequence = ''
 
@@ -106,7 +106,7 @@ class TranscriptDesigner:
             # Define upstream, current window, and downstream context
             preamble = final_sequence[:36]
             current_window = peptide[i:i + window_size]
-            downstream_context = peptide[i + window_size:len(peptide)]
+            downstream_context = peptide[i + window_size:i + window_size + 36]
 
             success = False  # Track if a suitable sequence is found
             retries = 0  # Initialize retry count
@@ -126,28 +126,30 @@ class TranscriptDesigner:
                 best_codon_seq, min_score = min_scored_codon
 
                 # Check if the best score meets the threshold
-                if min_score < 2:
+                if min_score < 5:
                     success = True  # Mark success if sequence meets score threshold
 
                 # If a suitable sequence was found, add the middle 3 codons to the final sequence
                 if success:
                     final_sequence += best_codon_seq
-                if retries == retry_limit:
+                if retries == retry_limit and not success:
                     final_sequence += best_codon_seq
 
-            if len(final_sequence) == 18:
-                selectedRBS = self.rbsChooser.run(final_sequence, ignores)
-                while not hairpin_checker(selectedRBS.utr + final_sequence)[0]:
-                    ignores.add(selectedRBS)
-                    selectedRBS = self.rbsChooser.run(final_sequence, ignores)
+            # if len(final_sequence) == 24:
+            #     self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
+            #     while not hairpin_checker(self.selectedRBS.utr + final_sequence)[0]:
+            #         ignores.add(self.selectedRBS)
+            #         self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
+            
 
-
+        # self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
+        self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
         final_sequence
 
             # Choose an RBS
 
         # Return the Transcript object
-        return Transcript(selectedRBS, peptide, codons=[final_sequence[i:i+3] for i in range(0, len(final_sequence), 3)])
+        return Transcript(self.selectedRBS, peptide, codons=[final_sequence[i:i+3] for i in range(0, len(final_sequence), 3)])
     
 
 if __name__ == "__main__":
