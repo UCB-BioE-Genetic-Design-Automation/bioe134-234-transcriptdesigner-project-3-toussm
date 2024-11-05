@@ -3,7 +3,7 @@ import traceback
 import csv
 import time
 from statistics import mean
-from genedesign.seq_utils.translate import Translate
+from genedesign.seq_utils.Translate import Translate
 from genedesign.transcript_designer import TranscriptDesigner
 from genedesign.checkers.forbidden_sequence_checker import ForbiddenSequenceChecker
 from genedesign.checkers.internal_promoter_checker import PromoterChecker
@@ -51,6 +51,7 @@ def benchmark_proteome(fasta_file):
     proteome = parse_fasta(fasta_file)
     successful_results = []
     error_results = []
+    i = 0
 
     for gene, protein in proteome.items():
         try:
@@ -62,13 +63,15 @@ def benchmark_proteome(fasta_file):
                 'protein': protein,
                 'transcript': transcript
             })
+            if i == 999:
+                break
         except Exception as e:
             error_results.append({
                 'gene': gene,
                 'protein': protein,
                 'error': f"Error: {str(e)}\nTraceback: {traceback.format_exc()}"
             })
-    
+        i += 1
     return successful_results, error_results
 
 def analyze_errors(error_results):

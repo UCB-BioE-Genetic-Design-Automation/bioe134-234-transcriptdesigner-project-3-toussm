@@ -53,16 +53,16 @@ class TranscriptDesigner:
                 # Store codons with their frequencies in a temporary dictionary
                 if amino_acid not in self.aminoAcidToCodon:
                     self.aminoAcidToCodon[amino_acid] = []
-                self.aminoAcidToCodon[amino_acid].append((codon, freq))
+                if codon in self.codonChecker.rare_codons:
+                    freq = freq / 5 # Lower freq value of rarecodons so they are much less likely to be chosen
+                    self.aminoAcidToCodon[amino_acid].append((codon, freq))
+                else:
+                    self.aminoAcidToCodon[amino_acid].append((codon, freq))
 
 
     def guided_random_codon_selection(self, aa):
         codons, weights = zip(*self.aminoAcidToCodon[aa])
-        adjusted_weights = [
-            weight if codon not in self.codonChecker.rare_codons else weight / 5
-            for codon, weight in zip(codons, weights)
-        ]
-        return random.choices(codons, weights=adjusted_weights, k=1)[0]
+        return random.choices(codons, weights=weights, k=1)[0]
     
     def window_scorer(self, seq):
         score = 0
@@ -89,6 +89,7 @@ class TranscriptDesigner:
                 sampled_sequence.insert(0, (sampled_seq, score))
         return sampled_sequence[0][0]
     
+    
 
     def run(self, peptide: str, ignores: set) -> Transcript:
         """
@@ -107,56 +108,22 @@ class TranscriptDesigner:
         final_sequence = ''
 
         window_size = 3
-        #retry_limit = 5  # Number of retries for problematic windows
-
+        
         # Iterate over amino acid sequence in sliding windows
-        for i in range(0, len(peptide)):
+        for i in range(0, len(peptide), window_size):
             # Define upstream, current window, and downstream context
-            preamble = final_sequence[:15]
+            preamble = final_sequence[:9]
             current_window = peptide[i:i + window_size]
             downstream_context = peptide[i + window_size:i + window_size + 6]
 
-            # success = False  # Track if a suitable sequence is found
-            # retries = 0  # Initialize retry count
-
-            # Retry sampling and scoring until success or retry limit is reached
-            # while retries < retry_limit and not success:
-            #     retries += 1
-
-                # Sample codons for the current window plus downstream context
+            # Sample codons for the current window plus downstream context
             sampled_codon = self.codon_generator(current_window + downstream_context, preamble=preamble)
-            final_sequence += sampled_codon[:3]
 
-                # scored_codons = [
-                #     (seq[:9], self.window_scorer(preamble + seq)) for seq in sampled_codons
-                # ]
+            # Add best window is added to final sequence
+            final_sequence += sampled_codon[:9]
 
-                # Find the best-scoring codon sequence
-                # min_scored_codon = min(scored_codons, key=lambda x: x[1])
-                # best_codon_seq, min_score = min_scored_codon
-
-                # # Check if the best score meets the threshold
-                # if min_score < 5:
-                #     success = True  # Mark success if sequence meets score threshold
-
-                # # If a suitable sequence was found, add the middle 3 codons to the final sequence
-                # if success:
-                #     final_sequence += best_codon_seq
-                # if retries == retry_limit and not success:
-                #     final_sequence += best_codon_seq
-
-            # if len(final_sequence) == 24:
-            #     self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
-            #     while not hairpin_checker(self.selectedRBS.utr + final_sequence)[0]:
-            #         ignores.add(self.selectedRBS)
-            #         self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
-            
-
-        # self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
+        # Choose an RBS    
         self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
-        final_sequence
-
-            # Choose an RBS
 
         # Return the Transcript object
         return Transcript(self.selectedRBS, peptide, codons=[final_sequence[i:i+3] for i in range(0, len(final_sequence), 3)])
