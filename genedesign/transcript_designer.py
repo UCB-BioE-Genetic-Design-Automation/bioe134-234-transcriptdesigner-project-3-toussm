@@ -80,7 +80,7 @@ class TranscriptDesigner:
         # Check promoter sequence
         if not self.promoterChecker.run(seq)[0]:
             score += 5
-        # If all checks pass
+        
         return score
     
     def codon_generator(self, amino_acids, preamble, randomSeed, samples=50): # Tried doing a method where it would search until it found a perfect sequence, but I waited 30 minutes and no solution was found. I am resorting to sampling.
