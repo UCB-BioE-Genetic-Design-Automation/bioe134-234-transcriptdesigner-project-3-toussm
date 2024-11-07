@@ -63,7 +63,7 @@ class TranscriptDesigner:
         codons, weights = zip(*self.aminoAcidToCodon[aa])
         return randomSeed.choices(codons, weights=weights, k=1)[0]
     
-    def window_scorer(self, seq):
+    def window_scorer(self, seq): # Going through every checker each window to try to minimize errors as much as possible at the expense of a little extra runtime
         score = 0
         # Check forbidden sequence
         if not self.forbiddenSeqChecker.run(seq)[0]:
@@ -83,7 +83,7 @@ class TranscriptDesigner:
         # If all checks pass
         return score
     
-    def codon_generator(self, amino_acids, preamble, randomSeed, samples=50): # Tried doing a method where it would search until it found a perfect sequence, but I waited 30 minutes and no solution was found. I am resorting to sampling.
+    def codon_generator(self, amino_acids, preamble, randomSeed, samples=100): # Tried doing a method where it would search until it found a perfect sequence, but I waited 30 minutes and no solution was found. I am resorting to sampling.
         sampled_sequence = [('', 50)] # Initialized with an unachievably bad score
         for _ in range(samples): # Search for sequences samples amount of times and if none pass then I return the best one to avoid exceptions and translation errors
             sampled_seq = ''.join(self.guided_random_codon_selection(aa, randomSeed=randomSeed) for aa in amino_acids)

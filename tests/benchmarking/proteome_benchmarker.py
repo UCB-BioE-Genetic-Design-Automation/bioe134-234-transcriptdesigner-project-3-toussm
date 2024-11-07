@@ -51,7 +51,6 @@ def benchmark_proteome(fasta_file):
     proteome = parse_fasta(fasta_file)
     successful_results = []
     error_results = []
-    i = 0
 
     for gene, protein in proteome.items():
         try:
@@ -63,15 +62,12 @@ def benchmark_proteome(fasta_file):
                 'protein': protein,
                 'transcript': transcript
             })
-            if i == 99:
-                break
         except Exception as e:
             error_results.append({
                 'gene': gene,
                 'protein': protein,
                 'error': f"Error: {str(e)}\nTraceback: {traceback.format_exc()}"
             })
-        i += 1
     return successful_results, error_results
 
 def analyze_errors(error_results):
