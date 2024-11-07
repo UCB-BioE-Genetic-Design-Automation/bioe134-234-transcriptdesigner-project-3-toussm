@@ -112,7 +112,7 @@ class TranscriptDesigner:
         # Iterate over amino acid sequence in sliding windows
         for i in range(0, len(peptide), window_size):
             # Define upstream, current window, and downstream context
-            preamble = final_sequence[:9]
+            preamble = final_sequence[-9:]
             current_window = peptide[i:i + window_size]
             downstream_context = peptide[i + window_size:i + window_size + 6]
 
@@ -121,9 +121,10 @@ class TranscriptDesigner:
 
             # Add best window is added to final sequence
             final_sequence += sampled_codon[:9]
-
+        
         # Choose an RBS    
         self.selectedRBS = self.rbsChooser.run(final_sequence, ignores)
+
 
         # Return the Transcript object
         return Transcript(self.selectedRBS, peptide, codons=[final_sequence[i:i+3] for i in range(0, len(final_sequence), 3)])
