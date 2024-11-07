@@ -20,7 +20,6 @@ class TranscriptDesigner:
         self.codonChecker = None
         self.promoterChecker = None
         self.selectedRBS = None
-        random.seed(10)
 
     def initiate(self) -> None:
         """
@@ -60,28 +59,34 @@ class TranscriptDesigner:
                     self.aminoAcidToCodon[amino_acid].append((codon, freq))
 
 
-    def guided_random_codon_selection(self, aa):
+    def guided_random_codon_selection(self, aa, randomSeed):
         codons, weights = zip(*self.aminoAcidToCodon[aa])
-        return random.choices(codons, weights=weights, k=1)[0]
+        return randomSeed.choices(codons, weights=weights, k=1)[0]
     
     def window_scorer(self, seq):
         score = 0
+        # Check forbidden sequence
         if not self.forbiddenSeqChecker.run(seq)[0]:
             score += 15
+        # Check codon validity
         if not self.codonChecker.run(seq)[0]:
             score += 5
+        # Check GC content
         if not self.gcChecker(seq)[0]:
             score += 5
+        # Check hairpins
         if not hairpin_checker(seq)[0]:
             score += 5
-        if not self.promoterChecker.run(seq):
+        # Check promoter sequence
+        if not self.promoterChecker.run(seq)[0]:
             score += 5
+        # If all checks pass
         return score
     
-    def codon_generator(self, amino_acids, preamble, samples=50):
-        sampled_sequence = [('', 50)]
-        for _ in range(samples):
-            sampled_seq = ''.join(self.guided_random_codon_selection(aa) for aa in amino_acids)
+    def codon_generator(self, amino_acids, preamble, randomSeed, samples=50): # Tried doing a method where it would search until it found a perfect sequence, but I waited 30 minutes and no solution was found. I am resorting to sampling.
+        sampled_sequence = [('', 50)] # Initialized with an unachievably bad score
+        for _ in range(samples): # Search for sequences samples amount of times and if none pass then I return the best one to avoid exceptions and translation errors
+            sampled_seq = ''.join(self.guided_random_codon_selection(aa, randomSeed=randomSeed) for aa in amino_acids)
             score = self.window_scorer(preamble + sampled_seq)
             if score < 5:
                 return sampled_seq
@@ -102,11 +107,16 @@ class TranscriptDesigner:
         Returns:
             Transcript: The transcript object with the selected RBS and translated codons.
         """
+        # Random seed using Random instance so it can be passed around
+        randomSeed = random.Random(10)
+
         # Add stop codon
         peptide += '*'
-    
+
+        # Initialize cds string
         final_sequence = ''
 
+        # Initialize window size
         window_size = 3
         
         # Iterate over amino acid sequence in sliding windows
@@ -117,7 +127,7 @@ class TranscriptDesigner:
             downstream_context = peptide[i + window_size:i + window_size + 6]
 
             # Sample codons for the current window plus downstream context
-            sampled_codon = self.codon_generator(current_window + downstream_context, preamble=preamble)
+            sampled_codon = self.codon_generator(current_window + downstream_context, preamble=preamble, randomSeed=randomSeed)
 
             # Add best window is added to final sequence
             final_sequence += sampled_codon[:9]

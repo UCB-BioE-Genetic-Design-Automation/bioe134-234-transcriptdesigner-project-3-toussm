@@ -63,7 +63,7 @@ def benchmark_proteome(fasta_file):
                 'protein': protein,
                 'transcript': transcript
             })
-            if i == 999:
+            if i == 99:
                 break
         except Exception as e:
             error_results.append({

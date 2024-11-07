@@ -20,91 +20,76 @@ class RBSChooser:
         """
         
         # Function to extract UTR, gene, and CDS information from the GenBank file
-        def extract_genes_info(genbank_file):
-            gene_dict = defaultdict(dict)  # Dictionary to store gene info
-            for record in SeqIO.parse(genbank_file, "genbank"):
-                for feature in record.features:
-                    if feature.type == "gene":
-                        locus_tag = feature.qualifiers.get("locus_tag", [None])[0]
-                        gene_name = feature.qualifiers.get("gene", [None])[0]
-
-                        # CDS information
-                        cds_feature = None
-                        for cds in record.features:
-                            if cds.type == "CDS" and cds.qualifiers.get("locus_tag") == [locus_tag]:
-                                cds_feature = cds
-                                break
-
-                        if cds_feature:
-                            start, end = cds_feature.location.start, cds_feature.location.end
-                            strand = cds_feature.location.strand
-                            if strand == 1:  # Forward strand
-                                utr_start = max(0, start - 50)
-                                utr_seq = record.seq[utr_start:start]
-                            else:  # Reverse strand, we need to reverse complement
-                                utr_start = end
-                                utr_seq = record.seq[utr_start:utr_start + 50].reverse_complement()
-
-                            cds_seq = cds_feature.extract(record.seq)
-                            # Save the gene information in the dictionary
-                            gene_dict[locus_tag] = {
-                                "gene": gene_name,
-                                "UTR": utr_seq,
-                                "CDS": cds_seq
-                            }
-            return gene_dict
-
-        # Example usage
         genbank_file = "genedesign/data/sequence.gb"  # Now using the correct file name
-        genes_info = extract_genes_info(genbank_file)
+        gene_dict = defaultdict(dict)  # Dictionary to store gene info
+        for record in SeqIO.parse(genbank_file, "genbank"):
+            for feature in record.features:
+                if feature.type == "gene":
+                    locus_tag = feature.qualifiers.get("locus_tag", [None])[0]
+                    gene_name = feature.qualifiers.get("gene", [None])[0]
+
+                    # CDS information
+                    cds_feature = None
+                    for cds in record.features:
+                        if cds.type == "CDS" and cds.qualifiers.get("locus_tag") == [locus_tag]:
+                            cds_feature = cds
+                            break
+
+                    if cds_feature:
+                        start, end = cds_feature.location.start, cds_feature.location.end
+                        strand = cds_feature.location.strand
+                        if strand == 1:  # Forward strand
+                            utr_start = max(0, start - 50)
+                            utr_seq = record.seq[utr_start:start]
+                        else:  # Reverse strand, we need to reverse complement
+                            utr_start = end
+                            utr_seq = record.seq[utr_start:utr_start + 50].reverse_complement()
+
+                        cds_seq = cds_feature.extract(record.seq)
+                        # Save the gene information in the dictionary
+                        gene_dict[locus_tag] = {
+                            "gene": gene_name,
+                            "UTR": utr_seq,
+                            "CDS": cds_seq
+                        }
+
 
         # Function to prune the dataset and return top 5% abundance values as a dictionary
-        def prune_proteomics_data(file_path):
-            # Read the dataset as a pandas DataFrame, skipping metadata lines starting with '#'
-            data = pd.read_csv(file_path, comment='#', sep='\t', names=['locus_tag', 'abundance'])
-
-            # Remove the '511145.' prefix from the locus tags
-            data['locus_tag'] = data['locus_tag'].str.replace('511145.', '', regex=False)
-
-            # Sort the data by abundance in descending order
-            data_sorted = data.sort_values(by='abundance', ascending=False)
-
-            # Calculate the top 5% of the dataset
-            top_5_percent_count = int(len(data_sorted) * 0.05)
-
-            # Prune the dataset to the top 5%
-            top_5_percent_data = data_sorted.head(top_5_percent_count)
-
-            # Convert the pruned data into a dictionary with locus_tag as key and abundance as value
-            pruned_data_dict = dict(zip(top_5_percent_data['locus_tag'], top_5_percent_data['abundance']))
-
-            return pruned_data_dict
-
-        # Path to your dataset file
         file_path = 'genedesign/data/511145-WHOLE_ORGANISM-integrated.txt'
+        # Read the dataset as a pandas DataFrame, skipping metadata lines starting with '#'
+        data = pd.read_csv(file_path, comment='#', sep='\t', names=['locus_tag', 'abundance'])
 
-        # Call the function and get the pruned data dictionary
-        pruned_data_dict = prune_proteomics_data(file_path)
+        # Remove the '511145.' prefix from the locus tags
+        data['locus_tag'] = data['locus_tag'].str.replace('511145.', '', regex=False)
+
+        # Sort the data by abundance in descending order
+        data_sorted = data.sort_values(by='abundance', ascending=False)
+
+        # Calculate the top 5% of the dataset
+        top_5_percent_count = int(len(data_sorted) * 0.05)
+
+        # Prune the dataset to the top 5%
+        top_5_percent_data = data_sorted.head(top_5_percent_count)
+
+        # Convert the pruned data into a dictionary with locus_tag as key and abundance as value
+        pruned_data_dict = dict(zip(top_5_percent_data['locus_tag'], top_5_percent_data['abundance']))
+
 
         # Function to merge the top 5% proteomics data with gene sequence data
-        def merge_data(top_5_dict, gene_dict):
-            merged_dict = {}
-            for locus_tag in top_5_dict:
-                if locus_tag in gene_dict:
-                    merged_dict[locus_tag] = {
-                        "abundance": top_5_dict[locus_tag],
-                        "gene_info": gene_dict[locus_tag]
-                    }
-            return merged_dict
+        merged_dict = {}
+        for locus_tag in pruned_data_dict:
+            if locus_tag in gene_dict:
+                merged_dict[locus_tag] = {
+                    "abundance": pruned_data_dict[locus_tag],
+                    "gene_info": gene_dict[locus_tag]
+                }
 
 
-        # Merge the two datasets
-        merged_data = merge_data(pruned_data_dict, genes_info)
 
         translate = Translate()
         translate.initiate()
 
-        for locus_tag, info in merged_data.items():
+        for locus_tag, info in merged_dict.items():
             rbs_option = RBSOption(
                 utr=info['gene_info']['UTR'],
                 cds=info['gene_info']['CDS'],
